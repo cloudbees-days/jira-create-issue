@@ -1,0 +1,500 @@
+= CloudBees action: Create Jira Issue
+
+Use this action to create new Jira issues with specified fields. The action accepts issue field data in YAML format (converted to JSON for the API) and provides detailed validation and error handling.
+
+== Inputs
+
+[cols="2a,2a,2a,5a",options="header"]
+.Input details
+|===
+
+| Input name
+| Data type
+| Required?
+| Description
+
+| `jira-url`
+| String
+| Yes
+| Jira instance URL (e.g., `https://your-domain.atlassian.net`)
+
+| `jira-username`
+| String
+| Yes
+| Jira username or email address for authentication
+
+| `jira-token`
+| String
+| Yes
+| Jira API token. Generate this in your Jira account settings under Security > API tokens
+
+| `project-key`
+| String
+| Yes
+| Project key where the issue will be created (e.g., `MYPROJECT`, `TEST`)
+
+| `issue-type`
+| String
+| Yes
+| Issue type name as it appears in Jira (e.g., `Bug`, `Story`, `Task`, `Epic`)
+
+| `issue-fields`
+| YAML Object
+| Yes
+| YAML object containing issue fields like summary, description, etc. Will be converted to JSON for the Jira API.
+
+| `notify-users`
+| Boolean
+| No
+| Whether to send notifications to users about the new issue. Default is `true`
+
+| `dry-run`
+| Boolean
+| No
+| If `true`, validates the issue data without creating it. Default is `false`
+
+|===
+
+== Outputs
+
+[cols="2a,2a,5a",options="header"]
+.Output details
+|===
+
+| Output name
+| Data type
+| Description
+
+| `issue-key`
+| String
+| The key of the created issue (e.g., `PROJ-123`)
+
+| `issue-id`
+| String
+| The internal ID of the created issue
+
+| `issue-url`
+| String
+| The URL to view the created issue in Jira
+
+| `issue-data`
+| JSON Object
+| Complete issue data returned by the Jira API after creation
+
+|===
+
+== Usage Examples
+
+=== Basic Usage - Create a Bug
+
+[source,yaml]
+----
+- name: Create bug report
+  uses: ./jira-create-issue
+  id: create-bug
+  with:
+    jira-url: https://mycompany.atlassian.net
+    jira-username: ${{ secrets.JIRA_USERNAME }}
+    jira-token: ${{ secrets.JIRA_TOKEN }}
+    project-key: MYPROJECT
+    issue-type: Bug
+    issue-fields: |
+      summary: "Application crashes on startup"
+      description: |
+        Steps to reproduce:
+        1. Launch the application
+        2. Observe crash during initialization
+        
+        Expected: Application starts normally
+        Actual: Application crashes with error XYZ
+      priority:
+        name: High
+
+- name: Show created issue
+  uses: docker://alpine:3.22
+  shell: sh
+  run: |
+    echo "Created issue: ${{ steps.create-bug.outputs.issue-key }}"
+    echo "URL: ${{ steps.create-bug.outputs.issue-url }}"
+----
+
+=== Advanced Usage - Create Story with Custom Fields
+
+[source,yaml]
+----
+- name: Create user story
+  uses: ./jira-create-issue
+  id: create-story
+  with:
+    jira-url: https://mycompany.atlassian.net
+    jira-username: ${{ secrets.JIRA_USERNAME }}
+    jira-token: ${{ secrets.JIRA_TOKEN }}
+    project-key: MYPROJECT
+    issue-type: Story
+    notify-users: false
+    issue-fields: |
+      summary: "As a user, I want to export data"
+      description: |
+        ## User Story
+        As a user, I want to export my data in CSV format
+        so that I can use it in external tools.
+        
+        ## Acceptance Criteria
+        - [ ] Export button is available in the data view
+        - [ ] CSV format includes all visible columns
+        - [ ] Download starts immediately when clicked
+        
+        ## Notes
+        Consider performance for large datasets
+      
+      # Standard fields
+      priority:
+        name: Medium
+      assignee:
+        accountId: "557058:f58131cb-b67d-43c7-b30d-6b58d40bd077"
+      labels:
+        - feature-request
+        - export
+        - user-story
+      components:
+        - name: Frontend
+        - name: API
+      fixVersions:
+        - name: v2.1.0
+      
+      # Custom fields
+      customfield_10001: "8"  # Story points
+      customfield_10002:      # Epic link
+        value: "MYPROJECT-100"
+      customfield_10003:      # Sprint
+        - value: "Sprint 23"
+
+- name: Link to related issues
+  uses: docker://alpine:3.22
+  shell: sh
+  run: |
+    echo "Story created: ${{ steps.create-story.outputs.issue-key }}"
+    # You could use the jira-update-issues action here to link issues
+----
+
+=== Dry Run - Validate Before Creating
+
+[source,yaml]
+----
+- name: Validate issue creation
+  uses: ./jira-create-issue
+  with:
+    jira-url: https://mycompany.atlassian.net
+    jira-username: ${{ secrets.JIRA_USERNAME }}
+    jira-token: ${{ secrets.JIRA_TOKEN }}
+    project-key: MYPROJECT
+    issue-type: Task
+    dry-run: true
+    issue-fields: |
+      summary: "Update documentation"
+      description: "Comprehensive update of API documentation"
+      assignee:
+        accountId: "557058:f58131cb-b67d-43c7-b30d-6b58d40bd077"
+----
+
+=== Automated Issue Creation from CI/CD
+
+[source,yaml]
+----
+- name: Create deployment issue
+  uses: ./jira-create-issue
+  id: deployment-issue
+  with:
+    jira-url: https://mycompany.atlassian.net
+    jira-username: ${{ secrets.JIRA_USERNAME }}
+    jira-token: ${{ secrets.JIRA_TOKEN }}
+    project-key: OPS
+    issue-type: Task
+    issue-fields: |
+      summary: "Deploy ${{ github.repository }} v${{ github.ref_name }}"
+      description: |
+        Automated deployment task created from CI/CD pipeline.
+        
+        **Repository:** ${{ github.repository }}
+        **Version:** ${{ github.ref_name }}
+        **Commit:** ${{ github.sha }}
+        **Triggered by:** ${{ github.actor }}
+        
+        ## Deployment Steps
+        - [ ] Deploy to staging
+        - [ ] Run smoke tests
+        - [ ] Deploy to production
+        - [ ] Verify deployment
+      
+      priority:
+        name: High
+      labels:
+        - deployment
+        - automation
+        - ${{ github.ref_name }}
+      
+      # Due date (3 days from now)
+      duedate: "2024-12-31"
+
+- name: Post deployment info
+  uses: docker://alpine:3.22
+  shell: sh
+  run: |
+    echo "Deployment tracking issue: ${{ steps.deployment-issue.outputs.issue-url }}"
+----
+
+== Issue Fields Format
+
+The `issue-fields` input accepts YAML that maps to Jira's field structure:
+
+=== Required Fields
+
+Most Jira projects require at least a `summary` field:
+
+[source,yaml]
+----
+issue-fields: |
+  summary: "Brief description of the issue"
+----
+
+=== Standard Fields
+
+[source,yaml]
+----
+# Basic text fields
+summary: "Issue title"
+description: |
+  Multi-line description
+  with **markdown** formatting
+  
+  - Bullet points
+  - Are supported
+
+# Priority
+priority:
+  name: "High"  # High, Medium, Low, or custom priorities
+
+# Assignee (use account ID, not display name)
+assignee:
+  accountId: "557058:f58131cb-b67d-43c7-b30d-6b58d40bd077"
+
+# Reporter (usually auto-set to current user)
+reporter:
+  accountId: "557058:f58131cb-b67d-43c7-b30d-6b58d40bd077"
+
+# Labels
+labels:
+  - urgent
+  - customer-facing
+  - api
+
+# Components
+components:
+  - name: "Backend"
+  - name: "Frontend"
+
+# Fix versions
+fixVersions:
+  - name: "v2.1.0"
+
+# Affects versions
+versions:
+  - name: "v2.0.0"
+
+# Due date (YYYY-MM-DD format)
+duedate: "2024-12-31"
+
+# Environment (text field)
+environment: "Production, Chrome 96, Windows 10"
+----
+
+=== Custom Fields
+
+Custom fields use the format `customfield_XXXXX`. Find the ID using browser dev tools:
+
+[source,yaml]
+----
+# Text custom fields
+customfield_10001: "Custom text value"
+
+# Number custom fields (story points, etc.)
+customfield_10002: 8
+
+# Date custom fields (YYYY-MM-DD)
+customfield_10003: "2024-12-31"
+
+# DateTime custom fields (ISO 8601)
+customfield_10004: "2024-12-31T23:59:59.000+0000"
+
+# Select dropdown custom fields
+customfield_10005:
+  value: "Option 1"
+
+# Multi-select custom fields
+customfield_10006:
+  - value: "Choice A"
+  - value: "Choice B"
+
+# User picker custom fields
+customfield_10007:
+  accountId: "557058:f58131cb-b67d-43c7-b30d-6b58d40bd077"
+
+# Multi-user picker custom fields
+customfield_10008:
+  - accountId: "557058:f58131cb-b67d-43c7-b30d-6b58d40bd077"
+  - accountId: "557058:a1b2c3d4-e5f6-1234-5678-9abcdef01234"
+
+# Cascade select custom fields
+customfield_10009:
+  value: "Parent Option"
+  child:
+    value: "Child Option"
+----
+
+== Finding Field Information
+
+To discover available fields and their formats:
+
+=== 1. Get Create Metadata
+Use this API call to see required and available fields:
+[source,bash]
+----
+curl -u email@example.com:api_token \
+  "https://your-domain.atlassian.net/rest/api/3/issue/createmeta?projectKeys=MYPROJECT&issuetypeNames=Bug&expand=projects.issuetypes.fields" \
+  | jq '.projects[0].issuetypes[0].fields'
+----
+
+=== 2. Examine Existing Issues
+Look at similar existing issues to understand field formats:
+[source,bash]
+----
+curl -u email@example.com:api_token \
+  "https://your-domain.atlassian.net/rest/api/3/issue/MYPROJECT-123" \
+  | jq '.fields'
+----
+
+=== 3. Use Browser Developer Tools
+1. Open Jira's "Create Issue" form in your browser
+2. Open Developer Tools (F12)
+3. Look at field names in the HTML (`customfield_XXXXX`)
+4. Fill out the form and inspect the network requests to see the JSON format
+
+== Authentication
+
+This action uses Jira API tokens for authentication. To set up:
+
+1. Go to your Jira account settings
+2. Navigate to Security > API tokens
+3. Create a new API token
+4. Store the token securely in your workflow secrets
+5. Use your email address as the username
+
+[WARNING]
+====
+Never hardcode credentials in your workflow files. Always use secrets or secure environment variables.
+====
+
+== Error Handling
+
+The action provides detailed error information:
+
+* **Project validation**: Ensures the project exists and you have access
+* **Issue type validation**: Verifies the issue type is available in the project
+* **Field validation**: Jira API validates all field values and formats
+* **Permission checks**: Ensures you have permission to create issues
+
+Common errors and solutions:
+
+* **"Field 'X' cannot be set"**: The field doesn't exist or isn't available for this issue type
+* **"User 'X' does not exist"**: Use account ID instead of username/email for user fields
+* **"Option 'X' is not valid"**: Check available options for select fields
+* **"Field 'X' is required"**: Add the missing required field to `issue-fields`
+
+== Best Practices
+
+1. **Use dry-run first**: Always test with `dry-run: true` for new issue templates
+2. **Validate field formats**: Test field formats with simple examples first
+3. **Use account IDs**: Always use Jira account IDs for user fields, not display names
+4. **Check required fields**: Use the create metadata API to see required fields for your project/issue type
+5. **Handle errors gracefully**: Check outputs and handle creation failures appropriately
+
+== Integration Examples
+
+=== Create Issue from Failed Tests
+
+[source,yaml]
+----
+- name: Run tests
+  run: npm test
+  continue-on-error: true
+  id: tests
+
+- name: Create bug report for test failures
+  if: steps.tests.outcome == 'failure'
+  uses: ./jira-create-issue
+  with:
+    jira-url: ${{ secrets.JIRA_URL }}
+    jira-username: ${{ secrets.JIRA_USERNAME }}
+    jira-token: ${{ secrets.JIRA_TOKEN }}
+    project-key: QA
+    issue-type: Bug
+    issue-fields: |
+      summary: "Test failures in ${{ github.repository }} - ${{ github.ref_name }}"
+      description: |
+        Automated test failures detected in CI/CD pipeline.
+        
+        **Build:** ${{ github.run_id }}
+        **Commit:** ${{ github.sha }}
+        **Branch:** ${{ github.ref_name }}
+        
+        Please investigate and fix the failing tests.
+      priority:
+        name: High
+      labels:
+        - test-failure
+        - ci-cd
+        - ${{ github.ref_name }}
+----
+
+=== Create Release Planning Issue
+
+[source,yaml]
+----
+- name: Create release planning issue
+  uses: ./jira-create-issue
+  with:
+    project-key: PM
+    issue-type: Epic
+    issue-fields: |
+      summary: "Release ${{ github.ref_name }} Planning"
+      description: |
+        Release planning epic for version ${{ github.ref_name }}
+        
+        ## Release Goals
+        - [ ] Feature freeze
+        - [ ] Testing phase
+        - [ ] Documentation updates
+        - [ ] Deployment preparation
+        
+        ## Timeline
+        - Planning: Week 1
+        - Development: Weeks 2-4
+        - Testing: Week 5
+        - Release: Week 6
+      
+      fixVersions:
+        - name: "${{ github.ref_name }}"
+      customfield_10001: "40"  # Epic story points estimate
+----
+
+== License
+
+This code is made available under the 
+link:https://opensource.org/license/mit/[MIT license].
+
+== References
+
+* link:https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-post[Jira Create Issue API]
+* link:https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-metadata/#api-rest-api-3-issue-createmeta-get[Jira Create Metadata API]
+* link:https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-fields/[Jira Fields Documentation]
+* Learn more about link:https://docs.cloudbees.com/docs/cloudbees-saas-platform-actions/latest/[using actions in CloudBees workflows]. 

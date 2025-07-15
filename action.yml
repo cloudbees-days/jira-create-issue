@@ -108,7 +108,7 @@ runs:
 
         # Convert description to ADF format if it's a plain string
         if echo "$ISSUE_FIELDS_JSON" | jq -e '.description' > /dev/null 2>&1; then
-          DESCRIPTION_TYPE=$(echo "$ISSUE_FIELDS_JSON" | jq -r 'type_of(.description)')
+          DESCRIPTION_TYPE=$(echo "$ISSUE_FIELDS_JSON" | jq -r '.description | type')
           if [ "$DESCRIPTION_TYPE" = "string" ]; then
             echo "Converting plain text description to Atlassian Document Format..."
             PLAIN_DESCRIPTION=$(echo "$ISSUE_FIELDS_JSON" | jq -r '.description')

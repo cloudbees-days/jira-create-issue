@@ -106,6 +106,41 @@ runs:
         ISSUE_FIELDS_JSON=$(cat /tmp/issue_fields.json)
         echo "Issue fields JSON: $ISSUE_FIELDS_JSON"
 
+        # Convert description to ADF format if it's a plain string
+        if echo "$ISSUE_FIELDS_JSON" | jq -e '.description' > /dev/null 2>&1; then
+          DESCRIPTION_TYPE=$(echo "$ISSUE_FIELDS_JSON" | jq -r 'type_of(.description)')
+          if [ "$DESCRIPTION_TYPE" = "string" ]; then
+            echo "Converting plain text description to Atlassian Document Format..."
+            PLAIN_DESCRIPTION=$(echo "$ISSUE_FIELDS_JSON" | jq -r '.description')
+            
+            # Convert newlines to proper ADF paragraph breaks
+            ADF_CONTENT=$(echo "$PLAIN_DESCRIPTION" | sed 's/$/\\n/' | tr -d '\n' | sed 's/\\n\\n/\\n/g' | sed 's/\\n$//')
+            
+            # Create ADF format
+            ADF_DESCRIPTION=$(jq -n \
+              --arg content "$ADF_CONTENT" \
+              '{
+                version: 1,
+                type: "doc",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [
+                      {
+                        type: "text",
+                        text: $content
+                      }
+                    ]
+                  }
+                ]
+              }')
+            
+            # Update the fields JSON with ADF description
+            ISSUE_FIELDS_JSON=$(echo "$ISSUE_FIELDS_JSON" | jq --argjson adf "$ADF_DESCRIPTION" '.description = $adf')
+            echo "Converted description to ADF format"
+          fi
+        fi
+
         # Validate project exists and get project info
         echo "Validating project: ${{ inputs.project-key }}"
         PROJECT_URL="${JIRA_URL}/rest/api/3/project/${{ inputs.project-key }}"

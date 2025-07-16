@@ -75,11 +75,7 @@ Use this action to create new Jira issues with specified fields. The action acce
 
 | `issue-url`
 | String
-| The URL to view the created issue in Jira
-
-| `issue-data`
-| JSON Object
-| Complete issue data returned by the Jira API after creation
+| The URL to view the created issue
 
 |===
 

@@ -99,8 +99,8 @@ Create new Jira issues with specified fields using YAML format for issue data.
       description: |
         Application crashes during initialization.
         
-        **Build:** ${{ github.run_id }}
-        **Commit:** ${{ github.sha }}
+        **Build:** ${{ cloudbees.run_id }}
+        **Commit:** ${{ cloudbees.scm.sha }}
       priority:
         name: "High"
       labels:

@@ -46,7 +46,7 @@ runs:
   steps:
     - id: create-issue
       name: Create Jira Issue
-      uses: docker://cloudbeesdemo/jira-actions:latest
+      uses: docker://cloudbeesdemo/jira-actions:v2
       shell: sh
       run: |
         /app/jira-actions create-issue \
